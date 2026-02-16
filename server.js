@@ -12,29 +12,42 @@ const io = new Server(server, {
 app.use(express.static(path.join(__dirname, 'public')));
 
 // نظام الغرف واللاعبين
-io.on('connection', (socket) => {
-    console.log('🚀 لاعب جديد دخل السيرفر ✅');
+// مخرن للنقاط
+const scores = {}; 
 
+io.on('connection', (socket) => {
     socket.on('joinRoom', (roomCode, username) => {
         socket.join(roomCode);
         socket.username = username;
         socket.roomCode = roomCode;
+        
+        // تعيين نقطة صفر للاعب الجديد إذا لم تكن موجودة
+        if (!scores[roomCode]) scores[roomCode] = {};
+        if (!scores[roomCode][username]) scores[roomCode][username] = 0;
+
         console.log(`✅ ${username} دخل الغرفة: ${roomCode}`);
-        io.to(roomCode).emit('chatMessage', { name: 'النظام', text: `${username} دخل التحدي!` });
+        
+        // إرسال الحرف الحالي وتحديث النقاط للجميع
+        io.to(roomCode).emit('gameUpdate', { 
+            category: 'اسم', 
+            char: 'أ', 
+            allScores: scores[roomCode] 
+        });
     });
 
     socket.on('submitAnswer', (ans) => {
         if (socket.roomCode) {
-            io.to(socket.roomCode).emit('chatMessage', { name: socket.username, text: ans });
+            // زيادة نقطة لكل إجابة (كمثال بسيط)
+            scores[socket.roomCode][socket.username] += 10; 
+
+            io.to(socket.roomCode).emit('chatMessage', { 
+                name: socket.username, 
+                text: ans,
+                points: scores[socket.roomCode][socket.username]
+            });
+            
+            // تحديث قائمة النقاط عند الجميع
+            io.to(socket.roomCode).emit('updateScores', scores[socket.roomCode]);
         }
     });
-
-    socket.on('disconnect', () => {
-        console.log('❌ لاعب غادر السيرفر');
-    });
-});
-
-const PORT = process.env.PORT || 10000;
-server.listen(PORT, () => {
-    console.log(`🚀 السيرفر شغال على الرابط : http://localhost:${PORT}`);
 });
