@@ -42,8 +42,7 @@
 </div>
 
 <script>
-    const socket = io(); // الربط تلقائياً بالسيرفر اللي شغال
-
+const socket = io("https://ramadangamefinal.onrender.com");
     function connectToServer() {
         const name = document.getElementById('username').value;
         if (name) {
