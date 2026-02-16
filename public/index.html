@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>تحدي رمضان أونلاين 🌐🌙</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        :root { --gold: #fbbf24; --night: #020617; --emerald: #064e3b; --danger: #ef4444; }
+        body { background: var(--night); color: white; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .box { width: 90%; max-width: 500px; padding: 30px; border: 2px solid var(--gold); border-radius: 40px; background: rgba(30, 41, 59, 0.95); text-align: center; box-shadow: 0 0 30px rgba(251, 191, 36, 0.1); }
+        input { width: 100%; padding: 15px; margin: 10px 0; border-radius: 15px; border: 1px solid #334155; background: #0f172a; color: white; text-align: center; font-size: 18px; }
+        .btn { cursor: pointer; padding: 15px; border-radius: 15px; border: none; font-weight: bold; width: 100%; margin-top: 10px; transition: 0.3s; font-size: 18px; }
+        .btn-gold { background: var(--gold); color: black; }
+        .btn-gold:hover { transform: scale(1.02); }
+        #timer { font-size: 60px; font-weight: 900; color: var(--gold); margin: 10px 0; }
+        .status-msg { margin-top: 15px; font-weight: bold; color: var(--gold); min-height: 24px; }
+    </style>
+</head>
+<body>
+
+<div class="box" id="mainBox">
+    <div id="lobby">
+        <h1 style="color: var(--gold);">مجلس رمضان 🏮</h1>
+        <p>أدخل اسمك لتبدأ التحدي أونلاين</p>
+        <input type="text" id="username" placeholder="اسمك المستعار">
+        <button class="btn btn-gold" onclick="connectToServer()">دخول اللعبة 🚀</button>
+    </div>
+
+    <div id="game" style="display: none;">
+        <div style="display: flex; justify-content: space-around; font-size: 20px; font-weight: bold;">
+            <div>الفئة: <span id="catDisplay" style="color: white;">-</span></div>
+            <div>الحرف: <span id="charDisplay" style="color: white;">-</span></div>
+        </div>
+        
+        <div id="timer">20</div>
+
+        <input type="text" id="answerInput" placeholder="اكتب إجابتك هنا..." autocomplete="off">
+        <button class="btn btn-gold" onclick="sendAnswer()">إرسال الإجابة ✅</button>
+        
+        <div class="status-msg" id="status"></div>
+    </div>
+</div>
+
+<script>
+    const socket = io(); // الربط تلقائياً بالسيرفر اللي شغال
+
+    function connectToServer() {
+        const name = document.getElementById('username').value;
+        if (name) {
+            document.getElementById('lobby').style.display = 'none';
+            document.getElementById('game').style.display = 'block';
+            socket.emit('joinGame', name);
+        } else {
+            alert("لازم تكتب اسمك أولاً!");
+        }
+    }
+
+    // استلام تحديثات اللعبة من السيرفر
+    socket.on('gameUpdate', (data) => {
+        document.getElementById('catDisplay').innerText = data.category;
+        document.getElementById('charDisplay').innerText = data.char;
+    });
+
+    function sendAnswer() {
+        const ans = document.getElementById('answerInput').value;
+        if (ans) {
+            socket.emit('submitAnswer', ans);
+            document.getElementById('answerInput').value = "";
+        }
+    }
+
+    socket.on('msg', (text) => {
+        document.getElementById('status').innerText = text;
+    });
+</script>
+</body>
+</html>
