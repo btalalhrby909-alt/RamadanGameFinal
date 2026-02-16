@@ -20,11 +20,11 @@
 
 <div class="box" id="mainBox">
     <div id="lobby">
-        <h1 style="color: var(--gold);">مجلس رمضان 🏮</h1>
-        <p>أدخل اسمك لتبدأ التحدي أونلاين</p>
-        <input type="text" id="username" placeholder="اسمك المستعار">
-        <button class="btn btn-gold" onclick="connectToServer()">دخول اللعبة 🚀</button>
-    </div>
+    <h1>مجلس رمضان 🌙</h1>
+    <input type="text" id="username" placeholder="اسمك المستعار">
+    <input type="text" id="roomCode" placeholder="كود الغرفة (مثلاً: 123)">
+    <button class="btn btn-gold" onclick="connectToRoom()">دخول الغرفة 🚀</button>
+</div>
 
     <div id="game" style="display: none;">
         <div style="display: flex; justify-content: space-around; font-size: 20px; font-weight: bold;">
@@ -54,11 +54,17 @@ const socket = io("https://ramadangamefinal.onrender.com");
         }
     }
 
-    // استلام تحديثات اللعبة من السيرفر
-    socket.on('gameUpdate', (data) => {
-        document.getElementById('catDisplay').innerText = data.category;
-        document.getElementById('charDisplay').innerText = data.char;
-    });
+    function connectToRoom() {
+    const name = document.getElementById('username').value;
+    const room = document.getElementById('roomCode').value;
+    if (name && room) {
+        document.getElementById('lobby').style.display = 'none';
+        document.getElementById('game').style.display = 'block';
+        socket.emit('joinRoom', room, name); // نرسل الكود والاسم للسيرفر
+    } else {
+        alert("لازم تكتب اسمك وكود الغرفة!");
+    }
+}
 
     function sendAnswer() {
         const ans = document.getElementById('answerInput').value;
