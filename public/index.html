@@ -38,44 +38,62 @@
     <button class="btn" onclick="send()">إرسال ✅</button>
 </div>
 
+<script src="/socket.io/socket.io.js"></script>
 <script>
-    // الاتصال التلقائي بالسيرفر الأونلاين
-    const socket = io(); 
+    const socket = io();
+    let myRoom = "";
+    let myName = "";
+    let gameState = {};
 
-    function join() {
-        const name = document.getElementById('username').value;
-        const room = document.getElementById('roomCode').value;
-        if (name && room) {
-            document.getElementById('lobby').style.display = 'none';
-            document.getElementById('game').style.display = 'block';
-            socket.emit('joinRoom', room, name);
-        } else {
-            alert("اكتب اسمك وكود الغرفة يا بطل!");
+    // قاعدة بيانات الجماد (نفس التي وضعتها أنت)
+    const jamad_db = [...]; // (أبقيها كما هي في كودك)
+
+    function connectToRoom() {
+        myName = document.getElementById('nameInput').value.trim();
+        myRoom = document.getElementById('roomInput').value.trim(); // أضف خانة للغرفة
+        if(myName && myRoom) {
+            socket.emit('joinRoom', myRoom, myName);
+            document.getElementById('setup-screen').classList.remove('active-screen');
+            document.getElementById('game-screen').classList.add('active-screen');
         }
     }
 
-    function send() {
-        const input = document.getElementById('answerInput');
-        if (input.value) {
-            socket.emit('submitAnswer', input.value);
-            input.value = '';
-        }
-    }
-
-    socket.on('chatMessage', (data) => {
-        const div = document.getElementById('messages');
-        div.innerHTML += `<div style="margin-bottom:5px;"><strong style="color:#fbbf24">${data.name}:</strong> ${data.text}</div>`;
-        div.scrollTop = div.scrollHeight;
+    // استقبال تحديثات اللعبة من السيرفر
+    socket.on('updateGameState', (data) => {
+        gameState = data;
+        updateUI();
+        if(data.gameStarted) startLocalTimer();
     });
 
-    socket.on('updateScores', (scores) => {
-        const board = document.getElementById('scoreBoard');
-        let text = "النقاط: ";
-        for (let user in scores) {
-            text += `${user} [${scores[user]}] | `;
+    function checkAnswer() {
+        const val = document.getElementById('wordInput').value.trim();
+        const currentPlayer = gameState.players[gameState.curIdx];
+
+        if(currentPlayer.name !== myName) {
+            alert("انتظر دورك!");
+            return;
         }
-        board.innerText = text;
+
+        // هنا تضع منطق الـ validation (نفس كودك الأصلي)
+        // إذا كانت الإجابة صحيحة، نرسلها للسيرفر:
+        socket.emit('submitWord', val);
+        document.getElementById('wordInput').value = "";
+    }
+
+    function updateUI() {
+        document.getElementById('catDisplay').innerText = ["أسماء", "حيوان", "بلاد", "جماد"][gameState.curCatIdx];
+        document.getElementById('charDisplay').innerText = gameState.reqChar || "أي حرف";
+        
+        document.getElementById('pGrid').innerHTML = gameState.players.map((p, i) => `
+            <div class="p-tag ${i === gameState.curIdx ? 'p-turn' : ''} ${p.isOut ? 'p-out' : ''}">
+                ${p.name}
+            </div>
+        `).join('');
+    }
+
+    socket.on('newMsg', (data) => {
+        const f = document.getElementById('feedback');
+        f.innerText = `${data.name}: ${data.text}`;
+        f.style.color = "var(--gold)";
     });
 </script>
-</body>
-</html>
