@@ -41,10 +41,7 @@
     </div>
     
     <div id="messages"></div> <input type="text" id="answerInput" placeholder="اكتب إجابتك هنا...">
-    <button class="btn-gold" onclick="sendAnswer()">إرسال ✅</button>
-</div>
-
-<script>
+   <script>
     const socket = io("https://ramadangamefinal.onrender.com");
 
     function connectToRoom() {
@@ -54,6 +51,8 @@
             document.getElementById('lobby').style.display = 'none';
             document.getElementById('game').style.display = 'block';
             socket.emit('joinRoom', room, name);
+        } else {
+            alert("الرجاء كتابة الاسم وكود الغرفة!");
         }
     }
 
@@ -61,28 +60,34 @@
         const input = document.getElementById('answerInput');
         if (input.value) {
             socket.emit('submitAnswer', input.value);
-            input.value = '';
+            input.value = ''; // تنظيف الخانة بعد الإرسال
         }
     }
 
+    // عرض الرسائل بشكل دائم (لن تختفي)
     socket.on('chatMessage', (data) => {
-        const msgDiv = document.getElementById('messages');
-        msgDiv.innerHTML += `<div><strong>${data.name}:</strong> ${data.text}</div>`;
-        msgDiv.scrollTop = msgDiv.scrollHeight; // النزول لآخر رسالة تلقائياً
+        const statusDiv = document.getElementById('status');
+        const newMsg = document.createElement('div');
+        newMsg.style.padding = "5px";
+        newMsg.style.borderBottom = "1px solid rgba(251, 191, 36, 0.2)";
+        // عرض الاسم والرسالة والنقاط الحالية
+        newMsg.innerHTML = `<span style="color: #fbbf24;">${data.name}:</span> ${data.text}`;
+        statusDiv.appendChild(newMsg);
+        statusDiv.scrollTop = statusDiv.scrollHeight; // النزول لآخر رسالة تلقائياً
     });
 
-    socket.on('updateScores', (allScores) => {
-        let text = "النقاط: ";
-        for (let user in allScores) {
-            text += `${user} (${allScores[user]}) | `;
-        }
-        document.getElementById('scoreList').innerText = text;
-    });
-
+    // تحديث النقاط والفئة والحرف للجميع
     socket.on('gameUpdate', (data) => {
-        document.getElementById('catDisplay').innerText = data.category;
-        document.getElementById('charDisplay').innerText = data.char;
+        if(data.category) document.getElementById('catDisplay').innerText = data.category;
+        if(data.char) document.getElementById('charDisplay').innerText = data.char;
+        
+        // إذا كان هناك نظام نقاط مرسل من السيرفر
+        if(data.allScores) {
+            let scoreText = "النقاط: ";
+            for (let user in data.allScores) {
+                scoreText += `${user} [${data.allScores[user]}] | `;
+            }
+            // يمكنك إضافة عنصر div في HTML لعرض scoreText
+        }
     });
 </script>
-</body>
-</html>
