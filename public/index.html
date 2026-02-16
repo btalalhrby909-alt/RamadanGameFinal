@@ -5,89 +5,76 @@
     <title>🌙 تحدي رمضان أونلاين</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        :root { --gold: #fbbf24; --night: #020617; }
         body { 
-            background: var(--night) url('https://www.transparenttextures.com/patterns/islamic-art.png'); 
+            background: #020617 url('https://www.transparenttextures.com/patterns/islamic-art.png'); 
             color: white; font-family: 'Segoe UI', sans-serif;
-            display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0;
+            display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0;
         }
-        .box { 
-            width: 90%; max-width: 500px; background: rgba(30, 41, 59, 0.9); 
-            padding: 20px; border-radius: 15px; border: 2px solid var(--gold); text-align: center;
-        }
-        #messages { 
-            height: 200px; overflow-y: auto; background: rgba(0,0,0,0.3); 
-            margin: 15px 0; padding: 10px; border-radius: 10px; text-align: right;
-        }
-        .score-board { color: var(--gold); font-weight: bold; margin-bottom: 10px; }
-        input { width: 80%; padding: 10px; margin: 5px 0; border-radius: 5px; border: none; }
-        .btn-gold { background: var(--gold); color: black; border: none; padding: 10px 20px; cursor: pointer; border-radius: 5px; font-weight: bold; }
+        .box { background: rgba(30, 41, 59, 0.95); padding: 25px; border-radius: 15px; border: 2px solid #fbbf24; text-align: center; width: 350px; }
+        #messages { height: 150px; overflow-y: auto; background: rgba(0,0,0,0.2); margin: 10px 0; padding: 10px; border-radius: 8px; text-align: right; border: 1px solid #334155; }
+        .score-item { color: #fbbf24; font-size: 0.9em; margin-bottom: 5px; }
+        input { width: 90%; padding: 10px; margin: 10px 0; border-radius: 8px; border: 1px solid #444; background: #0f172a; color: white; text-align: center; }
+        .btn { background: #fbbf24; color: black; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; }
     </style>
 </head>
 <body>
-
-<div class="box" id="lobby">
-    <h1>مجلس رمضان 🌙</h1>
-    <input type="text" id="username" placeholder="اسمك المستعار">
-    <input type="text" id="roomCode" placeholder="كود الغرفة">
-    <button class="btn-gold" onclick="connectToRoom()">دخول اللعبة 🚀</button>
-</div>
-
-<div class="box" id="game" style="display: none;">
-    <div class="score-board" id="scoreList">النقاط: جاري التحميل...</div>
-    <div style="display: flex; justify-content: space-around; font-size: 1.2em;">
-        <div>الفئة: <span id="catDisplay" style="color: var(--gold);">-</span></div>
-        <div>الحرف: <span id="charDisplay" style="color: var(--gold);">-</span></div>
+    <div class="box" id="lobby">
+        <h1>مجلس رمضان 🌙</h1>
+        <input type="text" id="username" placeholder="اسمك المستعار">
+        <input type="text" id="roomCode" placeholder="كود الغرفة">
+        <button class="btn" onclick="connectToRoom()">دخول الغرفة 🚀</button>
     </div>
-    
-    <div id="messages"></div> <input type="text" id="answerInput" placeholder="اكتب إجابتك هنا...">
-   <script>
-    const socket = io("https://ramadangamefinal.onrender.com");
 
-    function connectToRoom() {
-        const name = document.getElementById('username').value;
-        const room = document.getElementById('roomCode').value;
-        if (name && room) {
-            document.getElementById('lobby').style.display = 'none';
-            document.getElementById('game').style.display = 'block';
-            socket.emit('joinRoom', room, name);
-        } else {
-            alert("الرجاء كتابة الاسم وكود الغرفة!");
-        }
-    }
+    <div class="box" id="game" style="display: none;">
+        <div id="scoreBoard" style="margin-bottom: 10px; border-bottom: 1px solid #fbbf24; padding-bottom: 5px;"></div>
+        <div style="display: flex; justify-content: space-around; margin-bottom: 10px;">
+            <div>الفئة: <span id="catDisplay" style="color: #fbbf24;">-</span></div>
+            <div>الحرف: <span id="charDisplay" style="color: #fbbf24;">-</span></div>
+        </div>
+        <div id="messages"></div>
+        <input type="text" id="answerInput" placeholder="اكتب إجابتك...">
+        <button class="btn" onclick="sendAnswer()">إرسال ✅</button>
+    </div>
 
-    function sendAnswer() {
-        const input = document.getElementById('answerInput');
-        if (input.value) {
-            socket.emit('submitAnswer', input.value);
-            input.value = ''; // تنظيف الخانة بعد الإرسال
-        }
-    }
+    <script>
+        const socket = io(); // سيربط تلقائياً برابط Render
 
-    // عرض الرسائل بشكل دائم (لن تختفي)
-    socket.on('chatMessage', (data) => {
-        const statusDiv = document.getElementById('status');
-        const newMsg = document.createElement('div');
-        newMsg.style.padding = "5px";
-        newMsg.style.borderBottom = "1px solid rgba(251, 191, 36, 0.2)";
-        // عرض الاسم والرسالة والنقاط الحالية
-        newMsg.innerHTML = `<span style="color: #fbbf24;">${data.name}:</span> ${data.text}`;
-        statusDiv.appendChild(newMsg);
-        statusDiv.scrollTop = statusDiv.scrollHeight; // النزول لآخر رسالة تلقائياً
-    });
-
-    // تحديث النقاط والفئة والحرف للجميع
-    socket.on('gameUpdate', (data) => {
-        if(data.category) document.getElementById('catDisplay').innerText = data.category;
-        if(data.char) document.getElementById('charDisplay').innerText = data.char;
-        
-        // إذا كان هناك نظام نقاط مرسل من السيرفر
-        if(data.allScores) {
-            let scoreText = "النقاط: ";
-            for (let user in data.allScores) {
-                scoreText += `${user} [${data.allScores[user]}] | `;
+        function connectToRoom() {
+            const name = document.getElementById('username').value;
+            const room = document.getElementById('roomCode').value;
+            if (name && room) {
+                document.getElementById('lobby').style.display = 'none';
+                document.getElementById('game').style.display = 'block';
+                socket.emit('joinRoom', room, name);
             }
-            // يمكنك إضافة عنصر div في HTML لعرض scoreText
         }
-    });
-</script>
+
+        function sendAnswer() {
+            const input = document.getElementById('answerInput');
+            if (input.value) {
+                socket.emit('submitAnswer', input.value);
+                input.value = '';
+            }
+        }
+
+        socket.on('chatMessage', (data) => {
+            const div = document.getElementById('messages');
+            div.innerHTML += `<div><span style="color:#fbbf24">${data.name}:</span> ${data.text}</div>`;
+            div.scrollTop = div.scrollHeight;
+        });
+
+        socket.on('updateScores', (scores) => {
+            const board = document.getElementById('scoreBoard');
+            board.innerHTML = "";
+            for (let user in scores) {
+                board.innerHTML += `<div class="score-item">${user}: ${scores[user]} نقطة</div>`;
+            }
+        });
+
+        socket.on('gameUpdate', (data) => {
+            document.getElementById('catDisplay').innerText = data.category;
+            document.getElementById('charDisplay').innerText = data.char;
+        });
+    </script>
+</body>
+</html>

@@ -5,49 +5,45 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-    cors: { origin: "*" }
-});
+const io = new Server(server, { cors: { origin: "*" } });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// نظام الغرف واللاعبين
-// مخرن للنقاط
-const scores = {}; 
+// مخزن النقاط: { roomCode: { username: points } }
+const roomData = {};
 
 io.on('connection', (socket) => {
     socket.on('joinRoom', (roomCode, username) => {
         socket.join(roomCode);
         socket.username = username;
         socket.roomCode = roomCode;
-        
-        // تعيين نقطة صفر للاعب الجديد إذا لم تكن موجودة
-        if (!scores[roomCode]) scores[roomCode] = {};
-        if (!scores[roomCode][username]) scores[roomCode][username] = 0;
 
-        console.log(`✅ ${username} دخل الغرفة: ${roomCode}`);
-        
-        // إرسال الحرف الحالي وتحديث النقاط للجميع
+        if (!roomData[roomCode]) roomData[roomCode] = { scores: {}, currentRound: { cat: 'اسم', char: 'أ' } };
+        if (!roomData[roomCode].scores[username]) roomData[roomCode].scores[username] = 0;
+
         io.to(roomCode).emit('gameUpdate', { 
-            category: 'اسم', 
-            char: 'أ', 
-            allScores: scores[roomCode] 
+            category: roomData[roomCode].currentRound.cat, 
+            char: roomData[roomCode].currentRound.char, 
+            allScores: roomData[roomCode].scores 
         });
     });
 
     socket.on('submitAnswer', (ans) => {
-        if (socket.roomCode) {
-            // زيادة نقطة لكل إجابة (كمثال بسيط)
-            scores[socket.roomCode][socket.username] += 10; 
-
+        if (socket.roomCode && socket.username) {
+            roomData[socket.roomCode].scores[socket.username] += 10; // إضافة 10 نقاط
+            
             io.to(socket.roomCode).emit('chatMessage', { 
                 name: socket.username, 
-                text: ans,
-                points: scores[socket.roomCode][socket.username]
+                text: ans 
             });
-            
-            // تحديث قائمة النقاط عند الجميع
-            io.to(socket.roomCode).emit('updateScores', scores[socket.roomCode]);
+
+            io.to(socket.roomCode).emit('updateScores', roomData[socket.roomCode].scores);
         }
     });
+});
+
+// السطر الأهم لحل مشكلة Render (استخدام المنفذ 0.0.0.0)
+const PORT = process.env.PORT || 10000;
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 السيرفر يعمل بنجاح على المنفذ: ${PORT}`);
 });
