@@ -42,41 +42,42 @@
 </div>
 
 <script>
-const socket = io("https://ramadangamefinal.onrender.com");
-    function connectToServer() {
-        const name = document.getElementById('username').value;
-        if (name) {
-            document.getElementById('lobby').style.display = 'none';
-            document.getElementById('game').style.display = 'block';
-            socket.emit('joinGame', name);
-        } else {
-            alert("لازم تكتب اسمك أولاً!");
-        }
-    }
+    const socket = io("https://ramadangamefinal.onrender.com");
 
     function connectToRoom() {
-    const name = document.getElementById('username').value;
-    const room = document.getElementById('roomCode').value;
-    if (name && room) {
-        document.getElementById('lobby').style.display = 'none';
-        document.getElementById('game').style.display = 'block';
-        socket.emit('joinRoom', room, name); // نرسل الكود والاسم للسيرفر
-    } else {
-        alert("لازم تكتب اسمك وكود الغرفة!");
+        const name = document.getElementById('username').value;
+        const room = document.getElementById('roomCode').value;
+        if (name && room) {
+            document.getElementById('lobby').style.display = 'none';
+            document.getElementById('game').style.display = 'block';
+            socket.emit('joinRoom', room, name);
+        } else {
+            alert("الرجاء كتابة الاسم وكود الغرفة!");
+        }
     }
-}
 
     function sendAnswer() {
         const ans = document.getElementById('answerInput').value;
         if (ans) {
             socket.emit('submitAnswer', ans);
-            document.getElementById('answerInput').value = "";
+            document.getElementById('answerInput').value = ''; // تنظيف الخانة بعد الإرسال
         }
     }
 
-    socket.on('msg', (text) => {
-        document.getElementById('status').innerText = text;
+    // استلام الرسائل وعرضها في واجهة اللعبة
+    socket.on('chatMessage', (data) => {
+        const statusMsg = document.getElementById('status');
+        const newMsg = document.createElement('div');
+        newMsg.innerHTML = `<strong>${data.name}:</strong> ${data.text}`;
+        statusMsg.appendChild(newMsg);
+        
+        // مسح الرسائل القديمة تلقائياً بعد 5 ثوانٍ ليبقى المكان نظيفاً
+        setTimeout(() => { newMsg.remove(); }, 5000);
+    });
+
+    // تحديث الحرف والفئة للجميع في الغرفة
+    socket.on('gameUpdate', (data) => {
+        document.getElementById('catDisplay').innerText = data.category;
+        document.getElementById('charDisplay').innerText = data.char;
     });
 </script>
-</body>
-</html>
