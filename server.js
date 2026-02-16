@@ -9,8 +9,8 @@ const io = new Server(server, { cors: { origin: "*" } });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// مخزن النقاط: { roomCode: { username: points } }
-const roomData = {};
+let rooms = {};
+const categories = ["أسماء", "حيوانات", "نباتات", "جماد", "بلاد"];
 
 io.on('connection', (socket) => {
     socket.on('joinRoom', (roomCode, username) => {
@@ -18,32 +18,86 @@ io.on('connection', (socket) => {
         socket.username = username;
         socket.roomCode = roomCode;
 
-        if (!roomData[roomCode]) roomData[roomCode] = { scores: {}, currentRound: { cat: 'اسم', char: 'أ' } };
-        if (!roomData[roomCode].scores[username]) roomData[roomCode].scores[username] = 0;
+        if (!rooms[roomCode]) {
+            rooms[roomCode] = {
+                players: [],
+                scores: {},
+                usedWords: [],
+                currentCategoryIndex: 0,
+                currentChar: "",
+                turnIndex: 0,
+                gameStarted: false,
+                activePlayers: []
+            };
+        }
 
-        io.to(roomCode).emit('gameUpdate', { 
-            category: roomData[roomCode].currentRound.cat, 
-            char: roomData[roomCode].currentRound.char, 
-            allScores: roomData[roomCode].scores 
-        });
+        if (!rooms[roomCode].players.includes(username)) {
+            rooms[roomCode].players.push(username);
+            rooms[roomCode].scores[username] = 0;
+        }
+
+        io.to(roomCode).emit('updateData', rooms[roomCode]);
     });
 
-    socket.on('submitAnswer', (ans) => {
-        if (socket.roomCode && socket.username) {
-            roomData[socket.roomCode].scores[socket.username] += 10; // إضافة 10 نقاط
-            
-            io.to(socket.roomCode).emit('chatMessage', { 
-                name: socket.username, 
-                text: ans 
-            });
-
-            io.to(socket.roomCode).emit('updateScores', roomData[socket.roomCode].scores);
+    socket.on('startGame', () => {
+        const room = rooms[socket.roomCode];
+        if (room) {
+            room.gameStarted = true;
+            room.activePlayers = [...room.players];
+            room.usedWords = [];
+            room.turnIndex = 0;
+            room.currentCategoryIndex = 0;
+            room.currentChar = "أبجدهوزحطيكلمنصعفصقرستثخذضظغ"[Math.floor(Math.random() * 28)];
+            sendUpdate(socket.roomCode);
         }
     });
+
+    socket.on('submitAnswer', (word) => {
+        const room = rooms[socket.roomCode];
+        const currentPlayer = room.activePlayers[room.turnIndex];
+
+        if (socket.username !== currentPlayer) return;
+
+        // فحص التكرار والحرف الأخير
+        if (room.usedWords.includes(word) || !word.startsWith(room.currentChar)) {
+            // إقصاء اللاعب إذا أخطأ
+            room.activePlayers.splice(room.turnIndex, 1);
+            io.to(socket.roomCode).emit('chatMessage', { name: "النظام", text: `❌ إقصاء ${socket.username}! الكلمة خطأ أو مكررة.` });
+        } else {
+            room.usedWords.push(word);
+            room.currentChar = word.slice(-1); // الحرف الجديد هو آخر حرف
+            room.turnIndex = (room.turnIndex + 1) % room.activePlayers.length;
+        }
+
+        // فحص انتهاء الجولة (بقاء لاعب واحد)
+        if (room.activePlayers.length === 1) {
+            const winner = room.activePlayers[0];
+            room.scores[winner] += 1;
+            io.to(socket.roomCode).emit('chatMessage', { name: "النظام", text: `🏆 ${winner} فاز بالجولة وحصل على نقطة!` });
+            
+            // فحص الفوز النهائي (5 نقاط)
+            if (room.scores[winner] >= 5) {
+                io.to(socket.roomCode).emit('chatMessage', { name: "النظام", text: `🎊 ${winner} هو بطل اللعبة النهائي!` });
+                room.gameStarted = false;
+            } else {
+                // تغيير الفئة وبدء جولة جديدة
+                room.currentCategoryIndex = (room.currentCategoryIndex + 1) % categories.length;
+                room.activePlayers = [...room.players];
+                room.turnIndex = 0;
+            }
+        }
+
+        sendUpdate(socket.roomCode);
+    });
 });
 
-// السطر الأهم لحل مشكلة Render (استخدام المنفذ 0.0.0.0)
+function sendUpdate(roomCode) {
+    const room = rooms[roomCode];
+    io.to(roomCode).emit('updateData', {
+        ...room,
+        category: categories[room.currentCategoryIndex]
+    });
+}
+
 const PORT = process.env.PORT || 10000;
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 السيرفر يعمل بنجاح على المنفذ: ${PORT}`);
-});
+server.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));

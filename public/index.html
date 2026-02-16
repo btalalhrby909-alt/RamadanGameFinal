@@ -2,79 +2,96 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>🌙 تحدي رمضان أونلاين</title>
+    <title>🌙 لعبة آخر حرف</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         body { 
             background: #020617 url('https://www.transparenttextures.com/patterns/islamic-art.png'); 
-            color: white; font-family: 'Segoe UI', sans-serif;
+            color: white; font-family: 'Cairo', sans-serif;
             display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0;
         }
-        .box { background: rgba(30, 41, 59, 0.95); padding: 25px; border-radius: 15px; border: 2px solid #fbbf24; text-align: center; width: 350px; }
-        #messages { height: 150px; overflow-y: auto; background: rgba(0,0,0,0.2); margin: 10px 0; padding: 10px; border-radius: 8px; text-align: right; border: 1px solid #334155; }
-        .score-item { color: #fbbf24; font-size: 0.9em; margin-bottom: 5px; }
-        input { width: 90%; padding: 10px; margin: 10px 0; border-radius: 8px; border: 1px solid #444; background: #0f172a; color: white; text-align: center; }
-        .btn { background: #fbbf24; color: black; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; }
+        .container { 
+            width: 90%; max-width: 800px; background: rgba(15, 23, 42, 0.9); 
+            padding: 40px; border-radius: 25px; border: 3px solid #fbbf24; box-shadow: 0 0 50px rgba(251, 191, 36, 0.2);
+        }
+        .player-list { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 15px; margin-bottom: 20px; }
+        .active-turn { border: 2px solid #fbbf24; animation: glow 1s infinite alternate; }
+        @keyframes glow { from { box-shadow: 0 0 5px #fbbf24; } to { box-shadow: 0 0 20px #fbbf24; } }
+        #status-box { font-size: 1.5em; margin: 20px 0; color: #fbbf24; }
+        input { width: 70%; padding: 15px; border-radius: 10px; border: none; font-size: 1.2em; }
+        .btn { background: #fbbf24; color: black; padding: 15px 30px; border-radius: 10px; font-weight: bold; cursor: pointer; border: none; }
+        .details-btn { margin-top: 20px; background: none; color: #fbbf24; border: 1px solid #fbbf24; }
     </style>
 </head>
 <body>
-    <div class="box" id="lobby">
-        <h1>مجلس رمضان 🌙</h1>
-        <input type="text" id="username" placeholder="اسمك المستعار">
-        <input type="text" id="roomCode" placeholder="كود الغرفة">
-        <button class="btn" onclick="connectToRoom()">دخول الغرفة 🚀</button>
+
+<div class="container" id="lobby">
+    <h1>🌙 لعبة آخر حرف</h1>
+    <input type="text" id="username" placeholder="اسمك المستعار"><br><br>
+    <input type="text" id="roomCode" placeholder="كود الغرفة"><br><br>
+    <button class="btn" onclick="connect()">دخول اللعبة 🚀</button>
+    <br>
+    <button class="btn details-btn" onclick="alert('قوانين اللعبة:\n1. تبدأ بفئة وحرف.\n2. قل كلمة تبدأ بآخر حرف مما قاله زميلك.\n3. الفئات تتغير (اسم، حيوان...).\n4. أول من يصل لـ 5 نقاط يفوز!')">📜 تفاصيل اللعبة</button>
+</div>
+
+<div class="container" id="game" style="display:none;">
+    <div class="player-list" id="players"></div>
+    <div id="status-box">
+        الفئة: <span id="catDisplay">-</span> | الحرف: <span id="charDisplay">-</span>
     </div>
+    <h2 id="turnNotify" style="color: #4ade80; display:none;">🔔 دورك الآن!</h2>
+    <div id="chat" style="height: 150px; overflow-y: auto; margin-bottom: 20px; text-align: right; background: rgba(0,0,0,0.2); padding: 10px;"></div>
+    <input type="text" id="wordInput" placeholder="اكتب الكلمة هنا...">
+    <button class="btn" onclick="send()">إرسال ✅</button>
+    <br><br>
+    <button id="startBtn" class="btn" onclick="socket.emit('startGame')" style="display:none;">بدء الجولة 🚩</button>
+</div>
 
-    <div class="box" id="game" style="display: none;">
-        <div id="scoreBoard" style="margin-bottom: 10px; border-bottom: 1px solid #fbbf24; padding-bottom: 5px;"></div>
-        <div style="display: flex; justify-content: space-around; margin-bottom: 10px;">
-            <div>الفئة: <span id="catDisplay" style="color: #fbbf24;">-</span></div>
-            <div>الحرف: <span id="charDisplay" style="color: #fbbf24;">-</span></div>
-        </div>
-        <div id="messages"></div>
-        <input type="text" id="answerInput" placeholder="اكتب إجابتك...">
-        <button class="btn" onclick="sendAnswer()">إرسال ✅</button>
-    </div>
+<script>
+    const socket = io();
+    let myName = "";
 
-    <script>
-        const socket = io(); // سيربط تلقائياً برابط Render
-
-        function connectToRoom() {
-            const name = document.getElementById('username').value;
-            const room = document.getElementById('roomCode').value;
-            if (name && room) {
-                document.getElementById('lobby').style.display = 'none';
-                document.getElementById('game').style.display = 'block';
-                socket.emit('joinRoom', room, name);
-            }
+    function connect() {
+        myName = document.getElementById('username').value;
+        const room = document.getElementById('roomCode').value;
+        if (myName && room) {
+            document.getElementById('lobby').style.display = 'none';
+            document.getElementById('game').style.display = 'block';
+            socket.emit('joinRoom', room, myName);
         }
+    }
 
-        function sendAnswer() {
-            const input = document.getElementById('answerInput');
-            if (input.value) {
-                socket.emit('submitAnswer', input.value);
-                input.value = '';
-            }
+    function send() {
+        const input = document.getElementById('wordInput');
+        socket.emit('submitAnswer', input.value);
+        input.value = "";
+    }
+
+    socket.on('updateData', (data) => {
+        const pDiv = document.getElementById('players');
+        pDiv.innerHTML = "<b>اللاعبين: </b>" + data.players.map(p => 
+            `<span style="${p === data.activePlayers[data.turnIndex] ? 'color:#fbbf24; font-weight:bold;' : ''}">${p} (${data.scores[p]}ن)</span>`
+        ).join(" | ");
+
+        document.getElementById('catDisplay').innerText = data.category || "-";
+        document.getElementById('charDisplay').innerText = data.currentChar || "-";
+        
+        // تنبيه الدور
+        const isMyTurn = data.activePlayers[data.turnIndex] === myName;
+        document.getElementById('turnNotify').style.display = isMyTurn ? "block" : "none";
+        
+        if (!data.gameStarted && data.players[0] === myName) {
+            document.getElementById('startBtn').style.display = "inline-block";
+        } else {
+            document.getElementById('startBtn').style.display = "none";
         }
+    });
 
-        socket.on('chatMessage', (data) => {
-            const div = document.getElementById('messages');
-            div.innerHTML += `<div><span style="color:#fbbf24">${data.name}:</span> ${data.text}</div>`;
-            div.scrollTop = div.scrollHeight;
-        });
-
-        socket.on('updateScores', (scores) => {
-            const board = document.getElementById('scoreBoard');
-            board.innerHTML = "";
-            for (let user in scores) {
-                board.innerHTML += `<div class="score-item">${user}: ${scores[user]} نقطة</div>`;
-            }
-        });
-
-        socket.on('gameUpdate', (data) => {
-            document.getElementById('catDisplay').innerText = data.category;
-            document.getElementById('charDisplay').innerText = data.char;
-        });
-    </script>
+    socket.on('chatMessage', (data) => {
+        const chat = document.getElementById('chat');
+        chat.innerHTML += `<div><b>${data.name}:</b> ${data.text}</div>`;
+        chat.scrollTop = chat.scrollHeight;
+    });
+</script>
 </body>
 </html>
