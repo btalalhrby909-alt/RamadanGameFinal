@@ -2,185 +2,91 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>مجلس أخر حرف 🌙</title>
+    <title>أخر حرف - النسخة الاحترافية 🌙</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        :root {
-            --gold: #d4af37;
-            --gold-light: #f9e29b;
-            --deep-blue: #0a0e17;
-            --accent: #1e293b;
-        }
-
-        body {
-            background: var(--deep-blue) url('https://www.transparenttextures.com/patterns/dark-matter.png');
-            color: #fff;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-        }
-
-        /* حاوية اللعبة الفخمة */
-        .glass-panel {
-            background: rgba(15, 23, 42, 0.9);
-            border: 2px solid var(--gold);
-            border-radius: 30px;
-            padding: 40px;
-            width: 90%;
-            max-width: 600px;
-            box-shadow: 0 0 30px rgba(212, 175, 55, 0.2);
-            text-align: center;
-        }
-
-        .timer-circle {
-            font-size: 5rem;
-            font-weight: 900;
-            color: var(--gold-light);
-            text-shadow: 0 0 15px var(--gold);
-            margin: 20px 0;
-        }
-
-        .player-card {
-            display: inline-block;
-            padding: 10px 20px;
-            margin: 5px;
-            border-radius: 15px;
-            background: var(--accent);
-            border: 1px solid #334155;
-            transition: 0.3s;
-        }
-
-        .active-turn {
-            border-color: var(--gold);
-            box-shadow: 0 0 10px var(--gold);
-            background: #064e3b;
-        }
-
-        .is-out { opacity: 0.3; text-decoration: line-through; }
-
-        input {
-            width: 80%;
-            padding: 15px;
-            border-radius: 10px;
-            border: 1px solid var(--gold);
-            background: #000;
-            color: #fff;
-            font-size: 1.2rem;
-            text-align: center;
-            margin-top: 20px;
-        }
-
-        .btn-gold {
-            background: linear-gradient(45deg, var(--gold), var(--gold-light));
-            color: #000;
-            padding: 15px 30px;
-            border: none;
-            border-radius: 10px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 10px;
-            width: 85%;
-        }
-
-        #wordLog {
-            height: 60px;
-            overflow-x: auto;
-            white-space: nowrap;
-            margin: 20px 0;
-            padding: 10px;
-            background: rgba(0,0,0,0.3);
-            border-radius: 10px;
-            color: var(--gold-light);
-        }
+        /* (استخدم نفس الستايليات السابقة مع إضافة هذه التعديلات) */
+        .game-layout { display: grid; grid-template-columns: 1fr 300px; gap: 20px; width: 95%; max-width: 1000px; }
+        .chat-box { background: rgba(0,0,0,0.5); border-radius: 15px; display: flex; flex-direction: column; height: 500px; border: 1px solid var(--gold); }
+        #chatMsgs { flex: 1; overflow-y: auto; padding: 10px; font-size: 14px; }
+        #wordHistory { background: rgba(251, 191, 36, 0.1); padding: 10px; border-radius: 10px; height: 100px; overflow-y: auto; margin: 10px 0; border: 1px solid var(--gold); }
+        .timer-active { color: #ef4444; animation: blink 1s infinite; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
 
-<div class="glass-panel" id="lobby">
-    <h1 style="color: var(--gold)">مجلس رمضان 🌙</h1>
-    <input type="text" id="nameInp" placeholder="اسمك">
-    <input type="text" id="roomInp" placeholder="كود الغرفة">
-    <button class="btn-gold" onclick="join()">دخول البطولة</button>
+<div id="setup-screen" class="active-screen">
+    <input type="text" id="nameInput" placeholder="اسمك">
+    <input type="text" id="roomInput" placeholder="كود الغرفة">
+    <button class="btn-main" onclick="connect()">دخول</button>
 </div>
 
-<div class="glass-panel" id="game" style="display:none;">
-    <div id="pointsDisplay" style="color: var(--gold); margin-bottom: 10px;"></div>
-    <div id="playersList"></div>
-    
-    <div class="timer-circle" id="timer">20</div>
-    
-    <div style="font-size: 1.5rem;">
-        الفئة: <span id="cat" style="color:var(--gold)">-</span> | 
-        الحرف المطلوب: <span id="char" style="color:var(--gold)">-</span>
+<div class="game-layout" id="game-screen" style="display:none;">
+    <div class="game-wrapper">
+        <div id="timerDisplay" class="timer-val">20</div>
+        <h3>الفئة: <span id="catDisplay" style="color:var(--gold)">-</span> | الحرف: <span id="charDisplay" style="color:var(--gold)">-</span></h3>
+        
+        <div id="wordHistory"><b>الكلمات المستخدمة:</b><br><span id="usedWordsList"></span></div>
+        
+        <input type="text" id="wordInput" placeholder="اكتب إجابة صحيحة...">
+        <button class="btn-main" onclick="sendWord()">إرسال الكلمة</button>
     </div>
 
-    <div id="wordLog"></div>
-
-    <input type="text" id="wordInp" placeholder="اكتب الكلمة...">
-    <button class="btn-gold" onclick="submit()">إرسال ✅</button>
-    <button class="btn-gold" id="startBtn" onclick="socket.emit('startGame')" style="display:none; background: #064e3b; color: white;">ابدأ اللعبة 🚀</button>
+    <div class="chat-box">
+        <h4 style="margin:10px; color:var(--gold)">دردشة اللاعبين</h4>
+        <div id="chatMsgs"></div>
+        <input type="text" id="chatInput" placeholder="اكتب رسالة..." style="font-size:14px;">
+        <button onclick="sendChat()" style="background:var(--gold); border:none; padding:5px;">ارسل</button>
+    </div>
 </div>
 
 <script>
     const socket = io();
     let myName = "";
 
-    function join() {
-        myName = document.getElementById('nameInp').value;
-        const room = document.getElementById('roomInp').value;
+    function connect() {
+        myName = document.getElementById('nameInput').value;
+        const room = document.getElementById('roomInput').value;
         if(myName && room) {
             socket.emit('joinRoom', room, myName);
-            document.getElementById('lobby').style.display = 'none';
-            document.getElementById('game').style.display = 'block';
+            document.getElementById('setup-screen').style.display = 'none';
+            document.getElementById('game-screen').style.display = 'grid';
         }
     }
 
-    function submit() {
-        const inp = document.getElementById('wordInp');
+    function sendWord() {
+        const inp = document.getElementById('wordInput');
         socket.emit('submitWord', inp.value);
         inp.value = "";
     }
 
+    function sendChat() {
+        const inp = document.getElementById('chatInput');
+        socket.emit('sendChat', inp.value);
+        inp.value = "";
+    }
+
+    socket.on('timerUpdate', (time) => {
+        const t = document.getElementById('timerDisplay');
+        t.innerText = time;
+        if(time <= 5) t.classList.add('timer-active');
+        else t.classList.remove('timer-active');
+    });
+
     socket.on('updateGameState', (data) => {
-        const cats = ["أسماء", "حيوان", "جماد", "بلاد"];
-        document.getElementById('cat').innerText = cats[data.curCatIdx];
-        document.getElementById('char').innerText = data.reqChar || "أي حرف";
-        document.getElementById('wordLog').innerText = data.usedWords.join(" ← ");
-
-        // تحديث قائمة اللاعبين والنقاط
-        let pList = "";
-        let sList = "";
-        data.players.forEach((p, i) => {
-            const active = (i === data.curIdx) ? 'active-turn' : '';
-            const out = p.isOut ? 'is-out' : '';
-            pList += `<div class="player-card ${active} ${out}">${p.name}</div>`;
-            sList += `${p.name}: ${p.points}ن | `;
-        });
-        document.getElementById('playersList').innerHTML = pList;
-        document.getElementById('pointsDisplay').innerText = sList;
-
-        // إظهار زر البداية لأول لاعب فقط إذا لم تبدأ اللعبة
-        if(!data.timer && data.players[0].name === myName) {
-            document.getElementById('startBtn').style.display = 'block';
-        } else {
-            document.getElementById('startBtn').style.display = 'none';
-        }
+        document.getElementById('catDisplay').innerText = ["أسماء", "حيوان", "جماد", "بلاد"][data.curCatIdx];
+        document.getElementById('charDisplay').innerText = data.reqChar || "أي حرف";
+        document.getElementById('usedWordsList').innerText = data.usedWords.join(" ← ");
     });
 
-    socket.on('timerUpdate', (t) => {
-        document.getElementById('timer').innerText = t;
+    socket.on('newChatMsg', (data) => {
+        const div = document.getElementById('chatMsgs');
+        div.innerHTML += `<div><b>${data.name}:</b> ${data.text}</div>`;
+        div.scrollTop = div.scrollHeight;
     });
 
-    socket.on('gameResult', (msg) => {
-        alert(msg);
-        location.reload();
-    });
-
-    socket.on('errorMsg', (m) => alert(m));
-    socket.on('newChatMsg', (d) => console.log(d.text));
+    socket.on('errorMsg', (msg) => alert(msg));
 </script>
 </body>
 </html>
