@@ -2,98 +2,208 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>🌙 لعبة آخر حرف - أونلاين</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>أخر حرف - أونلاين 🌙</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        body { 
-            background: #020617 url('https://www.transparenttextures.com/patterns/islamic-art.png'); 
-            color: white; font-family: 'Arial', sans-serif;
-            display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0;
+        :root {
+            --gold: #fbbf24;
+            --emerald: #064e3b;
+            --night: #020617;
+            --danger: #ef4444;
+            --card: rgba(30, 41, 59, 0.98);
         }
-        .game-card { 
-            background: rgba(15, 23, 42, 0.95); padding: 30px; border-radius: 20px; 
-            border: 2px solid #fbbf24; width: 90%; max-width: 450px; text-align: center;
-            box-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: radial-gradient(circle at center, #1e293b 0%, #020617 100%);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
         }
-        #messages { height: 250px; overflow-y: auto; background: rgba(0,0,0,0.3); margin: 15px 0; padding: 10px; border-radius: 10px; text-align: right; border: 1px solid #334155; }
-        input { width: 85%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #fbbf24; background: #0f172a; color: white; text-align: center; }
-        .btn { background: #fbbf24; color: black; border: none; padding: 12px; cursor: pointer; font-weight: bold; width: 95%; border-radius: 8px; font-size: 1.1em; }
-        .score-list { color: #fbbf24; font-size: 0.9em; margin-bottom: 10px; border-bottom: 1px solid #334155; padding-bottom: 5px; }
+
+        @keyframes rumble {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+        .rumble-active { animation: rumble 0.1s infinite; border: 3px solid var(--danger) !important; }
+
+        .game-wrapper {
+            width: 95%;
+            max-width: 550px;
+            background: var(--card);
+            padding: 35px;
+            border-radius: 40px;
+            border: 2px solid var(--gold);
+            box-shadow: 0 0 50px rgba(251, 191, 36, 0.3);
+            text-align: center;
+            position: relative;
+        }
+
+        .lantern { position: absolute; top: -25px; font-size: 40px; filter: drop-shadow(0 0 10px var(--gold)); }
+        
+        #setup-screen, #game-screen { display: none; }
+        .active-screen { display: block !important; }
+
+        input {
+            width: 100%;
+            padding: 18px;
+            border-radius: 20px;
+            border: 2px solid #334155;
+            background: #0f172a;
+            color: white;
+            font-size: 20px;
+            text-align: center;
+            margin: 10px 0;
+            box-sizing: border-box;
+        }
+
+        .btn-main {
+            width: 100%;
+            padding: 18px;
+            border-radius: 20px;
+            border: none;
+            background: var(--gold);
+            color: black;
+            font-weight: 900;
+            font-size: 20px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(251, 191, 36, 0.3);
+        }
+
+        .booster-group { display: flex; gap: 12px; margin: 20px 0; }
+        .bomb-btn {
+            flex: 1;
+            padding: 15px;
+            border-radius: 15px;
+            border: none;
+            background: #475569;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .bomb-ready { background: linear-gradient(to bottom, #b45309, var(--gold)); color: black; }
+
+        .player-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 20px 0; }
+        .p-tag {
+            background: #1e293b;
+            padding: 10px;
+            border-radius: 12px;
+            font-size: 14px;
+            border: 1px solid #334155;
+        }
+        .p-turn { border-color: var(--gold); background: var(--emerald); box-shadow: 0 0 10px var(--gold); }
+        .p-out { opacity: 0.2; text-decoration: line-through; }
+
+        .timer-val { font-size: 60px; font-weight: 900; color: var(--gold); margin: 10px 0; }
     </style>
 </head>
 <body>
 
-<div class="game-card" id="lobby">
-    <h1>🌙 لعبة آخر حرف</h1>
-    <p>أدخل اسمك وكود الغرفة لتلعب مع أصحابك أونلاين</p>
-    <input type="text" id="username" placeholder="اسمك المستعار">
-    <input type="text" id="roomCode" placeholder="كود الغرفة (مثال: 777)">
-    <button class="btn" onclick="join()">دخول الغرفة 🚀</button>
+<div class="game-wrapper" id="mainBox">
+    <span class="lantern" style="right: 30px;">🏮</span>
+    <span class="lantern" style="left: 30px;">🏮</span>
+
+    <div id="setup-screen" class="active-screen">
+        <h1 style="color:var(--gold); margin-bottom: 5px;">أخر حرف أونلاين 🌙</h1>
+        <input type="text" id="nameInput" placeholder="اسمك المستعار">
+        <input type="text" id="roomInput" placeholder="كود الغرفة (مثلاً: 123)">
+        <button class="btn-main" onclick="connectToGame()">دخول اللعبة 🚀</button>
+    </div>
+
+    <div id="game-screen">
+        <div style="display:flex; justify-content: space-between; font-weight: bold;">
+            <span>الفئة: <span id="catDisplay" style="color:var(--gold)">-</span></span>
+            <span>الحرف: <span id="charDisplay" style="color:var(--gold)">-</span></span>
+        </div>
+        
+        <div id="timerDisplay" class="timer-val">20</div>
+        <div class="player-grid" id="pGrid"></div>
+
+        <div class="booster-group">
+            <button id="b1" class="bomb-btn" onclick="useBomb('cat')">💣 قنبلة الفئة</button>
+            <button id="b2" class="bomb-btn" onclick="useBomb('char')">⚡ قنبلة الحرف</button>
+        </div>
+
+        <input type="text" id="wordInput" placeholder="اكتب إجابتك هنا..." autocomplete="off">
+        <button class="btn-main" id="sendBtn" onclick="checkAnswer()">إرسال</button>
+        <div id="feedback" style="margin-top:20px; font-weight:bold; height:25px;"></div>
+    </div>
 </div>
 
-<div class="game-card" id="game" style="display:none;">
-    <div id="scoreBoard" class="score-list">النقاط: جاري التحميل...</div>
-    <div id="messages"></div>
-    <input type="text" id="answerInput" placeholder="اكتب كلمتك هنا...">
-    <button class="btn" onclick="send()">إرسال ✅</button>
-</div>
-
-<script src="/socket.io/socket.io.js"></script>
 <script>
     const socket = io();
-    let myRoom = "";
-    let myName = "";
-    let gameState = {};
+    let myName = "", myRoom = "", gameState = null;
 
-    // قاعدة بيانات الجماد (نفس التي وضعتها أنت)
-    const jamad_db = [...]; // (أبقيها كما هي في كودك)
-
-    function connectToRoom() {
+    function connectToGame() {
         myName = document.getElementById('nameInput').value.trim();
-        myRoom = document.getElementById('roomInput').value.trim(); // أضف خانة للغرفة
+        myRoom = document.getElementById('roomInput').value.trim();
         if(myName && myRoom) {
             socket.emit('joinRoom', myRoom, myName);
             document.getElementById('setup-screen').classList.remove('active-screen');
             document.getElementById('game-screen').classList.add('active-screen');
-        }
+        } else { alert("اكتب اسمك وكود الغرفة!"); }
     }
 
-    // استقبال تحديثات اللعبة من السيرفر
     socket.on('updateGameState', (data) => {
         gameState = data;
         updateUI();
-        if(data.gameStarted) startLocalTimer();
     });
 
     function checkAnswer() {
         const val = document.getElementById('wordInput').value.trim();
         const currentPlayer = gameState.players[gameState.curIdx];
 
-        if(currentPlayer.name !== myName) {
-            alert("انتظر دورك!");
+        if (currentPlayer.name !== myName) {
+            showMsg("انتظر دورك!", "var(--danger)");
             return;
         }
 
-        // هنا تضع منطق الـ validation (نفس كودك الأصلي)
-        // إذا كانت الإجابة صحيحة، نرسلها للسيرفر:
-        socket.emit('submitWord', val);
-        document.getElementById('wordInput').value = "";
+        if (val) {
+            socket.emit('submitWord', val);
+            document.getElementById('wordInput').value = "";
+        }
+    }
+
+    function useBomb(type) {
+        const currentPlayer = gameState.players[gameState.curIdx];
+        if (currentPlayer.name === myName) {
+            socket.emit('useBomb', type);
+        }
     }
 
     function updateUI() {
-        document.getElementById('catDisplay').innerText = ["أسماء", "حيوان", "بلاد", "جماد"][gameState.curCatIdx];
+        const cats = ["أسماء", "حيوان", "بلاد", "جماد"];
+        document.getElementById('catDisplay').innerText = cats[gameState.curCatIdx];
         document.getElementById('charDisplay').innerText = gameState.reqChar || "أي حرف";
         
         document.getElementById('pGrid').innerHTML = gameState.players.map((p, i) => `
             <div class="p-tag ${i === gameState.curIdx ? 'p-turn' : ''} ${p.isOut ? 'p-out' : ''}">
-                ${p.name}
+                ${p.name} ${p.name === myName ? '(أنت)' : ''}
             </div>
         `).join('');
+
+        const me = gameState.players.find(p => p.name === myName);
+        document.getElementById('b1').style.opacity = me?.bCat ? "1" : "0.3";
+        document.getElementById('b2').style.opacity = me?.bChar ? "1" : "0.3";
     }
 
     socket.on('newMsg', (data) => {
-        const f = document.getElementById('feedback');
-        f.innerText = `${data.name}: ${data.text}`;
-        f.style.color = "var(--gold)";
+        showMsg(`${data.name}: ${data.text}`, "var(--gold)");
     });
+
+    function showMsg(t, c) {
+        const m = document.getElementById('feedback');
+        m.innerText = t; m.style.color = c;
+    }
+
+    document.getElementById('wordInput').addEventListener('keypress', (e) => { if(e.key === 'Enter') checkAnswer(); });
 </script>
+</body>
+</html>

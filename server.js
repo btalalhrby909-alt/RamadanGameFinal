@@ -23,14 +23,13 @@ io.on('connection', (socket) => {
                 curIdx: 0,
                 reqChar: "",
                 curCatIdx: 0,
-                gameStarted: false,
                 usedWords: []
             };
         }
 
         const room = rooms[roomCode];
         if (!room.players.find(p => p.name === username)) {
-            room.players.push({ name: username, id: socket.id, isOut: false, bCat: true, bChar: true });
+            room.players.push({ name: username, isOut: false, bCat: true, bChar: true });
         }
 
         io.to(roomCode).emit('updateGameState', room);
@@ -40,23 +39,27 @@ io.on('connection', (socket) => {
         const room = rooms[socket.roomCode];
         if (!room) return;
 
-        // منطق التحقق هنا أو إرساله للجميع
         room.usedWords.push(word);
         room.reqChar = word.slice(-1);
-        
-        // الانتقال للاعب التالي
-        do {
-            room.curIdx = (room.curIdx + 1) % room.players.length;
-        } while (room.players[room.curIdx].isOut);
+        room.curIdx = (room.curIdx + 1) % room.players.length;
 
         io.to(socket.roomCode).emit('updateGameState', room);
         io.to(socket.roomCode).emit('newMsg', { name: socket.username, text: word });
     });
 
-    socket.on('disconnect', () => {
-        // يمكن إضافة منطق خروج اللاعب هنا
+    socket.on('useBomb', (type) => {
+        const room = rooms[socket.roomCode];
+        const p = room.players[room.curIdx];
+        if (type === 'cat' && p.bCat) {
+            p.bCat = false;
+            room.curCatIdx = (room.curCatIdx + 1) % 4;
+        } else if (type === 'char' && p.bChar) {
+            p.bChar = false;
+            room.reqChar = "ابجدهوزحطكلمنسعفصقرستثخذضظغ"[Math.floor(Math.random()*28)];
+        }
+        io.to(socket.roomCode).emit('updateGameState', room);
     });
 });
 
 const PORT = process.env.PORT || 10000;
-server.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, '0.0.0.0', () => console.log(`Online on ${PORT}`));
