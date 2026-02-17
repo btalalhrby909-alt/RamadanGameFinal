@@ -86,14 +86,30 @@ function startRoomTimer(roomCode) {
             room.timeLeft--;
             io.to(roomCode).emit('timerUpdate', room.timeLeft);
         } else {
-            // إقصاء اللاعب الحالي عند انتهاء الوقت
-            const loser = room.players[room.curIdx].name;
-            io.to(roomCode).emit('newChatMsg', { name: "النظام", text: `انتهى الوقت! إقصاء ${loser}` });
-            room.timeLeft = 20;
-            room.curIdx = (room.curIdx + 1) % room.players.length;
-            io.to(roomCode).emit('updateGameState', room);
+            eliminatePlayer(roomCode);
         }
     }, 1000);
+}
+
+function eliminatePlayer(roomCode) {
+    const room = rooms[roomCode];
+    const currentPlayer = room.players[room.curIdx];
+    currentPlayer.isOut = true;
+    
+    io.to(roomCode).emit('newChatMsg', { name: "📢", text: `تم إقصاء ${currentPlayer.name}!` });
+
+    const activePlayers = room.players.filter(p => !p.isOut);
+
+    if (activePlayers.length === 1) {
+        const winner = activePlayers[0];
+        winner.points += 1;
+        io.to(roomCode).emit('newChatMsg', { name: "🏆", text: `فاز ${winner.name} بالجولة!` });
+
+        if (winner.points >= 5) {
+            room.isGameOver = true;
+            io.to(roomCode).emit('gameResult', `${winner.name} هو بطل المجلس النهائي!`);
+        }
+    }
 }
 
 const PORT = process.env.PORT || 10000;
