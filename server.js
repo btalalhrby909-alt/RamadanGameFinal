@@ -9,6 +9,14 @@ const io = new Server(server, { cors: { origin: "*" } });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+// قاعدة بيانات مصغرة للكلمات الصحيحة (يمكنك زيادتها)
+const dictionary = {
+    "أسماء": ["احمد", "محمد", "سارة", "نورة", "علي", "خالد", "فهد", "ريم", "ليان", "يوسف", "عمر", "هند"],
+    "حيوان": ["اسد", "نمر", "فهد", "جمل", "خروف", "صقر", "نسر", "تمساح", "قرد", "حوت", "فيل"],
+    "جماد": ["طاولة", "كرسي", "قلم", "كتاب", "جوال", "مفتاح", "جدار", "شاشة", "باب", "سيارة", "ساعة"],
+    "بلاد": ["السعودية", "مصر", "الكويت", "الامارات", "قطر", "عمان", "اليمن", "العراق", "لبنان"]
+};
+
 let rooms = {};
 
 io.on('connection', (socket) => {
@@ -23,43 +31,70 @@ io.on('connection', (socket) => {
                 curIdx: 0,
                 reqChar: "",
                 curCatIdx: 0,
-                usedWords: []
+                usedWords: [],
+                chatHistory: [],
+                timeLeft: 20,
+                timer: null
             };
         }
 
         const room = rooms[roomCode];
         if (!room.players.find(p => p.name === username)) {
-            room.players.push({ name: username, isOut: false, bCat: true, bChar: true });
+            room.players.push({ name: username, id: socket.id, isOut: false, points: 0 });
         }
 
         io.to(roomCode).emit('updateGameState', room);
+        if (room.players.length >= 2 && !room.timer) startRoomTimer(roomCode);
     });
 
     socket.on('submitWord', (word) => {
         const room = rooms[socket.roomCode];
-        if (!room) return;
+        const cats = Object.keys(dictionary);
+        const currentCat = cats[room.curCatIdx];
 
-        room.usedWords.push(word);
-        room.reqChar = word.slice(-1);
-        room.curIdx = (room.curIdx + 1) % room.players.length;
+        // التحقق من صحة الكلمة (في القاموس + تبدأ بالحرف المطلوب + لم تستخدم من قبل)
+        const isExist = dictionary[currentCat].includes(word);
+        const isMatch = !room.reqChar || word.startsWith(room.reqChar);
+        const isNotUsed = !room.usedWords.includes(word);
 
-        io.to(socket.roomCode).emit('updateGameState', room);
-        io.to(socket.roomCode).emit('newMsg', { name: socket.username, text: word });
+        if (isExist && isMatch && isNotUsed) {
+            room.usedWords.push(word);
+            room.reqChar = word.slice(-1);
+            room.timeLeft = 20; // إعادة ضبط الوقت
+            
+            // الانتقال للاعب التالي
+            room.curIdx = (room.curIdx + 1) % room.players.length;
+            
+            // إذا اكتملت دورة كاملة، نغير الفئة
+            if (room.curIdx === 0) room.curCatIdx = (room.curCatIdx + 1) % cats.length;
+
+            io.to(socket.roomCode).emit('updateGameState', room);
+        } else {
+            socket.emit('errorMsg', "كلمة غير صحيحة أو مكررة!");
+        }
     });
 
-    socket.on('useBomb', (type) => {
-        const room = rooms[socket.roomCode];
-        const p = room.players[room.curIdx];
-        if (type === 'cat' && p.bCat) {
-            p.bCat = false;
-            room.curCatIdx = (room.curCatIdx + 1) % 4;
-        } else if (type === 'char' && p.bChar) {
-            p.bChar = false;
-            room.reqChar = "ابجدهوزحطكلمنسعفصقرستثخذضظغ"[Math.floor(Math.random()*28)];
-        }
-        io.to(socket.roomCode).emit('updateGameState', room);
+    socket.on('sendChat', (msg) => {
+        io.to(socket.roomCode).emit('newChatMsg', { name: socket.username, text: msg });
     });
 });
 
+function startRoomTimer(roomCode) {
+    const room = rooms[roomCode];
+    room.timer = setInterval(() => {
+        if (room.timeLeft > 0) {
+            room.timeLeft--;
+            io.to(roomCode).emit('timerUpdate', room.timeLeft);
+        } else {
+            // إقصاء اللاعب الحالي عند انتهاء الوقت
+            const loser = room.players[room.curIdx].name;
+            io.to(roomCode).emit('newChatMsg', { name: "النظام", text: `انتهى الوقت! إقصاء ${loser}` });
+            room.timeLeft = 20;
+            room.curIdx = (room.curIdx + 1) % room.players.length;
+            io.to(roomCode).emit('updateGameState', room);
+        }
+    }, 1000);
+}
+
 const PORT = process.env.PORT || 10000;
-server.listen(PORT, '0.0.0.0', () => console.log(`Online on ${PORT}`));
+server.listen(PORT, '0.0.0.0', () => console.log(`Game Server on ${PORT}`));
